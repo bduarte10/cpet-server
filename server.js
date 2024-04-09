@@ -4,14 +4,6 @@ const nodemailer = require('nodemailer');
 const mailgunTransport = require('nodemailer-mailgun-transport');
 const cors = require('cors'); //Importa o cors para proteção basica da aplicação
 
-/**
- * SendGrid
- * O Send grid prove um serviço 0800 com ate´ 100 emails/dia
- * Crie uma conta, crie uma chave de api e modifique no arquivo .ENV
- * @type {MailService}
- */
-const sendGrid = require('@sendgrid/mail');
-
 const app = express();
 
 app.use(cors()); //Se deseja bloquear requisições de dominios diferentes, faça o bloqueio usando o cors
