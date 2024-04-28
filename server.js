@@ -1,7 +1,6 @@
 const express = require("express");
 const path = require("path");
 const nodemailer = require("nodemailer");
-const mailgunTransport = require("nodemailer-mailgun-transport");
 const cors = require("cors"); //Importa o cors para proteção basica da aplicação
 
 const app = express();
@@ -101,8 +100,7 @@ app.post("/lead/disciplinas-isoladas", async function (req, res) {
   });
 });
 
-// Rota para servir a página React
-app.get("*", function (req, res) {
+app.get("*", function (_, res) {
   res.sendFile(path.join(__dirname, "build", "index.html"));
 });
 
