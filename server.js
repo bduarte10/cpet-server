@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("path");
 const nodemailer = require("nodemailer");
 const cors = require("cors"); //Importa o cors para proteção basica da aplicação
+const e = require("express");
 
 const app = express();
 
@@ -46,9 +47,9 @@ app.post("/lead/email/send", async function (req, res) {
 
       transporter.sendMail(messageToLead, (errorLead, infoLead) => {
         if (errorLead) {
-          res.status(500).send("Erro ao enviar e-mail");
+          res.status(500).send("Erro ao enviar e-mail", errorLead);
         } else {
-          res.status(200).send("E-mail enviado com sucesso!");
+          res.status(200).send("E-mail enviado com sucesso!", infoLead);
         }
       });
     }
@@ -73,31 +74,42 @@ app.post("/lead/disciplinas-isoladas", async function (req, res) {
         <p>Telefone: ${req.body.telefone}</p>
         <p>E-mail: ${req.body.email}</p>`,
   };
-
-  transporter.sendMail(messageToOwner, (errorOwner, infoOwner) => {
-    if (errorOwner) {
-      console.error("Erro ao enviar e-mail:", errorOwner);
-      res.status(500).send("Erro ao enviar e-mail");
-    } else {
-      const messageToLead = {
-        to: req.body.email, //E-MAIL DO LEAD QUE RECEBERA A CONFIRMAÇÃO DO PEDIDO DE CONTATO
-        from: process.env.CONF_MAIL_SENDER, //E-MAIL CADASTRADO NO SERVIÇO SENDGRID QUE FARA O DISPARO
-        subject: "ConectaEdu - Disciplinas Isoladas - Confirmação de recebimento de contato",
-        html: `<p><strong>Confirmação de recebimento de contato</strong></p>
+  const messageToLead = {
+    to: req.body.email, //E-MAIL DO LEAD QUE RECEBERA A CONFIRMAÇÃO DO PEDIDO DE CONTATO
+    from: process.env.CONF_MAIL_SENDER, //E-MAIL CADASTRADO NO SERVIÇO SENDGRID QUE FARA O DISPARO
+    subject: "ConectaEdu - Disciplinas Isoladas - Confirmação de recebimento de contato",
+    html: `<p><strong>Confirmação de recebimento de contato</strong></p>
           <p><strong>Olá ${req.body.nome}</strong></p>
           <p>Este e-mail é uma confirmação de que recebemos o seu contato e iremos retornar em breve.</p>
           `,
-      };
+  };
 
-      transporter.sendMail(messageToLead, (errorLead, infoLead) => {
-        if (errorLead) {
-          res.status(500).send("Erro ao enviar e-mail");
-        } else {
-          res.status(200).send("E-mail enviado com sucesso!");
-        }
-      });
-    }
+  const sendOwnerEmail = new Promise((resolve, reject) => {
+    transporter.sendMail(messageToOwner, (error, info) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(info);
+      }
+    });
   });
+
+  const sendLeadEmail = new Promise((resolve, reject) => {
+    transporter.sendMail(messageToLead, (error, info) => {
+      if (error) {
+        reject(error);
+      } else {
+        resolve(info);
+      }
+    });
+  });
+
+  try {
+    await Promise.all([sendOwnerEmail, sendLeadEmail]);
+    res.status(200).send("E-mails enviados com sucesso!");
+  } catch (error) {
+    res.status(500).send("Erro ao enviar e-mails");
+  }
 });
 
 app.get("*", function (_, res) {
