@@ -1,12 +1,19 @@
 const express = require("express");
 const path = require("path");
 const nodemailer = require("nodemailer");
-const cors = require("cors"); //Importa o cors para proteção basica da aplicação
-const e = require("express");
+const cors = require("cors");
 
 const app = express();
 
-app.use(cors()); //Se deseja bloquear requisições de dominios diferentes, faça o bloqueio usando o cors
+app.use(
+  cors({
+    origin: [
+      "https://www.disciplinas-isoladas.conectaedu.com.br",
+      "https://disciplinas-isoladas.conectaedu.com.br",
+      "https://conectaedu.com.br",
+    ],
+  })
+);
 
 app.use(express.static(path.join(__dirname, "build")));
 app.use(express.json()); // Adicione este middleware para analisar o corpo da solicitação como JSON
@@ -57,6 +64,7 @@ app.post("/lead/email/send", async function (req, res) {
 });
 
 app.post("/lead/disciplinas-isoladas", async function (req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -66,22 +74,13 @@ app.post("/lead/disciplinas-isoladas", async function (req, res) {
   });
 
   const messageToOwner = {
-    to: process.env.CONF_MAIL_DISC_ISOLADA, //E-MAIL DO DONO DO SITE QUE VAI RECEBER O CONTATO DO LEAD
-    from: process.env.CONF_MAIL_SENDER, //E-MAIL CADASTRADO NO SERVIÇO SENDGRID QUE FARA O DISPARO
+    to: process.env.CONF_MAIL_DISC_ISOLADA,
+    from: process.env.CONF_MAIL_SENDER,
     subject: "Lead Disciplinas Isoladas " + new Date().toLocaleDateString().toString() + " - " + req.body.email,
     html: `<p><strong>Novo lead CPET</strong></p>
         <p>Nome: ${req.body.nome}</p>
         <p>Telefone: ${req.body.telefone}</p>
-        <p>E-mail: ${req.body.email}</p>`,
-  };
-  const messageToLead = {
-    to: req.body.email, //E-MAIL DO LEAD QUE RECEBERA A CONFIRMAÇÃO DO PEDIDO DE CONTATO
-    from: process.env.CONF_MAIL_SENDER, //E-MAIL CADASTRADO NO SERVIÇO SENDGRID QUE FARA O DISPARO
-    subject: "ConectaEdu - Disciplinas Isoladas - Confirmação de recebimento de contato",
-    html: `<p><strong>Confirmação de recebimento de contato</strong></p>
-          <p><strong>Olá ${req.body.nome}</strong></p>
-          <p>Este e-mail é uma confirmação de que recebemos o seu contato e iremos retornar em breve.</p>
-          `,
+         ${req.body.email ? `E-mail: ${req.body.email}` : ""}`,
   };
 
   const sendOwnerEmail = new Promise((resolve, reject) => {
@@ -94,18 +93,30 @@ app.post("/lead/disciplinas-isoladas", async function (req, res) {
     });
   });
 
-  const sendLeadEmail = new Promise((resolve, reject) => {
-    transporter.sendMail(messageToLead, (error, info) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve(info);
-      }
-    });
-  });
+  let sendLeadEmail;
+  if (req.body.email.trim() !== "") {
+    const messageToLead = {
+      to: req.body.email,
+      from: process.env.CONF_MAIL_SENDER,
+      subject: "ConectaEdu - Disciplinas Isoladas - Confirmação de recebimento de contato",
+      html: `<p><strong>Confirmação de recebimento de contato</strong></p>
+            <p><strong>Olá ${req.body.nome}</strong></p>
+            <p>Este e-mail é uma confirmação de que recebemos o seu contato e iremos retornar em breve.</p>
+            `,
+    };
 
+    sendLeadEmail = new Promise((resolve, reject) => {
+      transporter.sendMail(messageToLead, (error, info) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(info);
+        }
+      });
+    });
+  }
   try {
-    await Promise.all([sendOwnerEmail, sendLeadEmail]);
+    (await Promise.all([sendOwnerEmail, sendLeadEmail])).filter(Boolean);
     res.status(200).send("E-mails enviados com sucesso!");
   } catch (error) {
     res.status(500).send("Erro ao enviar e-mails");
